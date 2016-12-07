@@ -1,10 +1,13 @@
 var request = require("superagent");
-var host = "http://api.world-of-myths.com";
+var host = "http://localhost:3001";
 var game;
 var player;
 var opponent;
 var events = [];
 var es = "";
+var p1;
+var p2;
+var fs = require("fs");
 
 function createGame() {
     return new Promise(function (resolve, reject) {
@@ -19,6 +22,9 @@ function createGame() {
             .end(function (err, res) {
                 game = JSON.parse(res.text);
                 updatePLayerslayer();
+
+                p1 = game.gameBoard.players[0];
+                p2 = game.gameBoard.players[1];
 
                 resolve(game);
             });
@@ -83,6 +89,24 @@ function playCard(player, cardsCount) {
                     "anonymous": true
                 },
                 "cards": cards
+            })
+            .end(function (err, res) {
+                resolve(JSON.parse(res.text));
+            });
+    });
+}
+
+function summonGod(player) {
+    return new Promise(function (resolve, reject) {
+        request
+            .post(host + "/game/summon-god")
+            .set("Authorization", `Bearer ${game.accessToken}`)
+            .send({
+                "gameId": game.gameId,
+                "player": {
+                    "username": player.username,
+                    "anonymous": true
+                }
             })
             .end(function (err, res) {
                 resolve(JSON.parse(res.text));
@@ -228,6 +252,8 @@ function doAction(promise) {
 
                 es = JSON.stringify(events);
 
+                fs.writeFileSync("events.json", es);
+
                 return {
                     res: res,
                     board: board
@@ -236,9 +262,15 @@ function doAction(promise) {
     })
 }
 
-createGame()
+Promise.resolve()
+    .then(function () {
+        return createGame();
+    })
     .then(function (data) {
         return doAction(startGame());
+    })
+    .then(function (data) {
+        return doAction(summonGod(player));
     })
     .then(function (data) {
         return doAction(playCard(player, 2));
@@ -259,10 +291,25 @@ createGame()
         return doAction(declareAttackers(player, 1));
     })
     .then(function (data) {
-        return doAction(declareTarget(player, 0));
+        return doAction(declareTarget(player, 1));
     })
     .then(function (data) {
-        return doAction(declareDefender(player, 1));
+        // return doAction(declareDefender(player, 1));
+    })
+    .then(function (data) {
+        return doAction(pass(player));
+    })
+    .then(function (data) {
+        return doAction(killOnBoard(player, 0));
+    })
+    .then(function (data) {
+        //start new battle
+    })
+    .then(function (data) {
+        return doAction(declareAttackers(player, 0));
+    })
+    .then(function (data) {
+        return doAction(declareTarget(player, 0));
     })
     .then(function (data) {
         return doAction(pass(player));
@@ -273,5 +320,7 @@ createGame()
     .then(function (data) {
 
     })
-    .catch(function () { });
-    
+    .catch(function () {
+
+    });
+
